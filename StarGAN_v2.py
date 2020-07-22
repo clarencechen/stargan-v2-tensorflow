@@ -84,13 +84,14 @@ class StarGAN_v2():
         self.use_tpu = args.use_tpu
 
         if self.use_tfrecord:
-            dataset_path = 'gs://celeba-hq-dataset/'
+            dataset_path = 'gs://celeba-hq-dataset/' # modify later to accomodate multiple datasets
+            self.domain_list = ['male', 'female']
         else:
-            dataset_path = os.path.join('./dataset', self.dataset_name)
+            dataset_path = os.path.join('./data', self.dataset_name)
+            self.domain_list = sorted([os.path.basename(x) for x in glob(self.dataset_path + '/*')])
         
         self.dataset_path = os.path.join(dataset_path, 'train')
         self.test_dataset_path = os.path.join(dataset_path, 'test')
-        self.domain_list = sorted([os.path.basename(x) for x in glob(self.dataset_path + '/*')])
         self.num_domains = len(self.domain_list)
 
         print()
@@ -127,17 +128,17 @@ class StarGAN_v2():
     def build_model(self):
         if self.phase == 'train':
             """ Input Image"""
-            img_class = Image_data(self.img_size, self.img_ch, self.dataset_path, self.domain_list, self.augment_flag)
-            img_class.preprocess()
+            img_class = Image_data(self.img_size, self.img_ch, self.dataset_path, self.augment_flag)
 
-            dataset_num = len(img_class.images)
+            dataset_num = 28000 # modify later to accomodate multiple datasets
             print("Dataset number : ", dataset_num)
 
             if self.use_tfrecord:
                 filenames = ['{}_part_{}'.format(os.path.join(self.dataset_path, 'data.tfrecord.gzip'), i) for i in range(self.num_shards)]
                 img_and_domain = tf.data.TFRecordDataset(filenames, compression_type='GZIP', num_parallel_reads=self.num_shards)
             else:   
-                img_and_domain = tf.data.Dataset.from_tensor_slices((img_class.images, img_class.domains))
+                images, domains = build_filename_list(self.dataset_path, self.domain_list)
+                img_and_domain = tf.data.Dataset.from_tensor_slices((images, domains))
                 gpu_device = '/gpu:0'
 
             img_and_domain = img_and_domain.shuffle(buffer_size=dataset_num, reshuffle_each_iteration=True).repeat()

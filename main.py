@@ -80,7 +80,7 @@ def check_args(args):
     # --use_tpu
     if args.use_tpu:
         try:
-            assert use_tfrecord
+            assert args.use_tfrecord
         except:
             print('must use tfrecord dataset when training on tpu device')
 

@@ -18,18 +18,14 @@ from glob import glob
 
 class Image_data:
 
-    def __init__(self, img_size, channels, dataset_path, domain_list, augment_flag):
+    def __init__(self, img_size, channels, dataset_path, augment_flag):
         self.img_height = img_size
         self.img_width = img_size
         self.channels = channels
         self.augment_flag = augment_flag
 
         self.dataset_path = dataset_path
-        self.domain_list = domain_list
 
-        self.images = []
-        self.shuffle_images = []
-        self.domains = []
 
     def parse_function(self, example):
 
@@ -63,15 +59,18 @@ class Image_data:
 
         return img, domain
 
-    def preprocess(self):
-        # self.domain_list = ['tiger', 'cat', 'dog', 'lion']
+def build_filename_list(dataset_path, domain_list):
+    # domain_list = ['tiger', 'cat', 'dog', 'lion']
 
-        for idx, domain in enumerate(self.domain_list):
-            image_list = glob(os.path.join(self.dataset_path, domain) + '/*.png') + glob(os.path.join(self.dataset_path, domain) + '/*.jpg')
-            domain_list = [[idx]] * len(image_list)  # [ [0], [0], ... , [0] ]
+    images, domains = [], []
+    for idx, domain in enumerate(domain_list):
+        image_list = glob(os.path.join(dataset_path, domain) + '/*.png') + glob(os.path.join(dataset_path, domain) + '/*.jpg')
+        domain_list = [[idx]] * len(image_list)  # [ [0], [0], ... , [0] ]
 
-            self.images.extend(image_list)
-            self.domains.extend(domain_list)
+        images.extend(image_list)
+        domains.extend(domain_list)
+
+    return images, domains
 
 def adjust_dynamic_range(images, range_in, range_out, out_dtype):
     scale = (range_out[1] - range_out[0]) / (range_in[1] - range_in[0])
