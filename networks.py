@@ -118,8 +118,7 @@ class MappingNetwork(tf.keras.Model):
             x += [layer(h)]
 
         x = tf.stack(x, axis=1) # [bs, num_domains, style_dim]
-        x = tf.gather(x, domain, axis=1, batch_dims=-1)  # [bs, 1, style_dim]
-        x = tf.squeeze(x, axis=1)
+        x = tf.gather(x, domain, axis=1, batch_dims=1)  # [bs, style_dim]
         # x = x[:, domain, :] # [bs, style_dim]
 
         return x
@@ -177,8 +176,7 @@ class StyleEncoder(tf.keras.Model):
             x += [layer(h)]
 
         x = tf.stack(x, axis=1) # [bs, num_domains, style_dim]
-        x = tf.gather(x, domain, axis=1, batch_dims=-1) # [bs, 1, style_dim]
-        x = tf.squeeze(x, axis=1)
+        x = tf.gather(x, domain, axis=1, batch_dims=1) # [bs, style_dim]
 
         # x = x[:, domain, :] # [bs, style_dim]
 
@@ -228,7 +226,7 @@ class Discriminator(tf.keras.Model):
         x = self.encoder(x)
         x = tf.reshape(x, shape=[x.shape[0], -1]) # [bs, num_domains]
 
-        x = tf.gather(x, domain, axis=1, batch_dims=-1) # [bs, 1]
+        x = tf.gather(x, domain, axis=1, batch_dims=1) # [bs, 1]
         # x = x[:, domain] # [bs]
 
         return x
