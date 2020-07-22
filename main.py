@@ -23,7 +23,7 @@ def parse_args():
     parser.add_argument('--iteration', type=int, default=100000, help='The number of training iterations')
     parser.add_argument('--ds_iter', type=int, default=100000, help='Number of iterations to optimize diversity sensitive loss')
 
-    parser.add_argument('--batch_size', type=int, default=8, help='The size of batch size')  # each gpu
+    parser.add_argument('--batch_size', type=int, default=8, help='The batch size for each replica')  # each gpu
     parser.add_argument('--print_freq', type=int, default=1000, help='The number of image_print_freq')
     parser.add_argument('--save_freq', type=int, default=10000, help='The number of ckpt_save_freq')
     parser.add_argument('--num_style', type=int, default=5, help='Number of generated images per domain during sampling')
@@ -50,6 +50,10 @@ def parse_args():
     parser.add_argument('--img_size', type=int, default=256, help='The size of image')
     parser.add_argument('--img_ch', type=int, default=3, help='The size of image channel')
     parser.add_argument('--augment_flag', type=str2bool, default=True, help='Image augmentation use or not')
+
+    parser.add_argument('--use_tfrecord', type=str2bool, default=False, help='Flag to use tfrecord packed dataset')
+    parser.add_argument('--num_shards', type=int, default=False, help='Number of shards in divided tfrecord dataset')
+    parser.add_argument('--use_tpu', type=str2bool, default=False, help='Flag to use available TPU device')
 
     parser.add_argument('--checkpoint_dir', type=str, default='checkpoint',
                         help='Directory name to save the checkpoints')
@@ -94,10 +98,29 @@ def check_args(args):
 def main():
 
     args = parse_args()
+    
+    # Find TPU device if possible
+    if args.use_tpu :
+        try :
+            tpu = tf.distribute.cluster_resolver.TPUClusterResolver()
+            print('Running on TPU ', tpu.cluster_spec().as_dict()['worker'])
+        except ValueError:
+            tpu = None
+    
+    else :
+        tpu = None
 
-    automatic_gpu_usage()
+    # TPUStrategy for distributed training
+    if tpu :
+        tf.config.experimental_connect_to_cluster(tpu)
+        tf.tpu.experimental.initialize_tpu_system(tpu)
+        strategy = tf.distribute.experimental.TPUStrategy(tpu)
+    
+    else :
+        automatic_gpu_usage()
+        strategy = tf.distribute.get_strategy()
 
-    gan = StarGAN_v2(args)
+    gan = StarGAN_v2(args, strategy)
 
     # build graph
     gan.build_model()

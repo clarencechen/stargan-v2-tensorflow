@@ -31,46 +31,46 @@ class Image_data:
         self.shuffle_images = []
         self.domains = []
 
+    def parse_function(self, example):
 
-    def image_processing(self, filename, filename2, domain):
+        feature_description = {
+            'img': tf.io.FixedLenFeature([], tf.string, default_value=''),
+            'domain': tf.io.FixedLenFeature([], tf.int64, default_value=0),
+        }
+        example_dict = tf.io.parse_single_example(example, feature_description)
+        return tf.io.parse_tensor(example_dict['img'], out_type=tf.float32), example_dict['domain']
+
+    def read_function(self, filename, domain):
 
         x = tf.io.read_file(filename)
         x_decode = tf.image.decode_jpeg(x, channels=self.channels, dct_method='INTEGER_ACCURATE')
         img = tf.image.resize(x_decode, [self.img_height, self.img_width])
         img = preprocess_fit_train_image(img)
 
-        x = tf.io.read_file(filename2)
-        x_decode = tf.image.decode_jpeg(x, channels=self.channels, dct_method='INTEGER_ACCURATE')
-        img2 = tf.image.resize(x_decode, [self.img_height, self.img_width])
-        img2 = preprocess_fit_train_image(img2)
+        return img, domain
 
-        if self.augment_flag :
-            seed = random.randint(0, 2 ** 31 - 1)
-            condition = tf.greater_equal(tf.random.uniform(shape=[], minval=0.0, maxval=1.0), 0.5)
+    def image_processing(self, img, domain):
 
-            augment_height_size = self.img_height + (30 if self.img_height == 256 else int(self.img_height * 0.1))
-            augment_width_size = self.img_width + (30 if self.img_width == 256 else int(self.img_width * 0.1))
+        seed = random.randint(0, 2 ** 31 - 1)
+        condition = tf.greater_equal(tf.random.uniform(shape=[], minval=0.0, maxval=1.0), 0.5)
 
-            img = tf.cond(pred=condition,
-                          true_fn=lambda : augmentation(img, augment_height_size, augment_width_size, seed),
-                          false_fn=lambda : img)
+        augment_height_size = self.img_height + (30 if self.img_height == 256 else int(self.img_height * 0.1))
+        augment_width_size = self.img_width + (30 if self.img_width == 256 else int(self.img_width * 0.1))
 
-            img2 = tf.cond(pred=condition,
-                          true_fn=lambda: augmentation(img2, augment_height_size, augment_width_size, seed),
-                          false_fn=lambda: img2)
+        img = tf.cond(pred=condition,
+                      true_fn=lambda : augmentation(img, augment_height_size, augment_width_size, seed),
+                      false_fn=lambda : img)
 
-        return img, img2, domain
+        return img, domain
 
     def preprocess(self):
         # self.domain_list = ['tiger', 'cat', 'dog', 'lion']
 
         for idx, domain in enumerate(self.domain_list):
             image_list = glob(os.path.join(self.dataset_path, domain) + '/*.png') + glob(os.path.join(self.dataset_path, domain) + '/*.jpg')
-            shuffle_list = random.sample(image_list, len(image_list))
             domain_list = [[idx]] * len(image_list)  # [ [0], [0], ... , [0] ]
 
             self.images.extend(image_list)
-            self.shuffle_images.extend(shuffle_list)
             self.domains.extend(domain_list)
 
 def adjust_dynamic_range(images, range_in, range_out, out_dtype):
