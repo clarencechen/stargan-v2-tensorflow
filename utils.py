@@ -18,13 +18,15 @@ from glob import glob
 
 class Image_data:
 
-    def __init__(self, img_size, channels, dataset_path, augment_flag):
+    def __init__(self, img_size, channels, dataset_path, augment_flag, batch_size, latent_dim):
         self.img_height = img_size
         self.img_width = img_size
         self.channels = channels
         self.augment_flag = augment_flag
 
         self.dataset_path = dataset_path
+        self.batch_size = batch_size
+        self.latent_dim = latent_dim
 
 
     def parse_function(self, example):
@@ -58,6 +60,11 @@ class Image_data:
                       false_fn=lambda : img)
 
         return img, domain
+
+    def inject_z(self, img_batch, domain_batch):
+
+        z_vals = tf.random.normal([self.batch_size, self.latent_dim])
+        return img_batch, domain_batch, z_vals
 
 def build_filename_list(dataset_path, domain_list):
     # domain_list = ['tiger', 'cat', 'dog', 'lion']

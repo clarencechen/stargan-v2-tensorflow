@@ -128,7 +128,7 @@ class StarGAN_v2():
     def build_model(self):
         if self.phase == 'train':
             """ Input Image"""
-            img_class = Image_data(self.img_size, self.img_ch, self.dataset_path, self.augment_flag)
+            img_class = Image_data(self.img_size, self.img_ch, self.dataset_path, self.augment_flag, self.batch_size, self.latent_dim)
 
             dataset_num = 28000 # modify later to accomodate multiple datasets
             print("Dataset number : ", dataset_num)
@@ -152,6 +152,7 @@ class StarGAN_v2():
                 img_and_domain = img_and_domain.map(map_func=img_class.image_processing, num_parallel_calls=AUTOTUNE)
 
             img_and_domain = img_and_domain.batch(self.batch_size, drop_remainder=True)
+            img_and_domain = img_and_domain.map(img_class.inject_z, num_parallel_calls=AUTOTUNE)
 
             if self.use_tpu:
                 img_and_domain = img_and_domain.prefetch(buffer_size=AUTOTUNE)
@@ -366,12 +367,9 @@ class StarGAN_v2():
             # decay weight for diversity sensitive loss as a tf.Tensor
             ds_weight = tf.maximum(0.0, self.ds_weight_init -(self.ds_weight_init / self.ds_iter) * idx)
             
-            x_real, y_org = next(self.img_and_domain_iter)
-            x_ref, y_trg = next(self.img_and_domain_iter)
-            x_ref2, y_trg2 = next(self.img_and_domain_iter)
-
-            z_trg = tf.random.normal(shape=[self.batch_size, self.latent_dim])
-            z_trg2 = tf.random.normal(shape=[self.batch_size, self.latent_dim])
+            x_real, y_org, _ = next(self.img_and_domain_iter)
+            x_ref, y_trg, z_trg = next(self.img_and_domain_iter)
+            x_ref2, y_trg2, z_trg2 = next(self.img_and_domain_iter)
 
             loss_package = self.train_combined_step(x_real, y_org, (x_ref, x_ref2), (y_trg, y_trg2), (z_trg, z_trg2), ds_weight)
 
