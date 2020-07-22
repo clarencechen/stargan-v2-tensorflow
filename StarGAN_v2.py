@@ -25,12 +25,11 @@ class StarGAN_v2():
         self.model_name = 'StarGAN_v2'
         self.strategy = strategy
         self.phase = args.phase
-        self.checkpoint_dir = args.checkpoint_dir
-        self.result_dir = args.result_dir
-        self.log_dir = args.log_dir
-        self.sample_dir = args.sample_dir
+
         self.dataset_name = args.dataset
         self.augment_flag = args.augment_flag
+        self.use_tfrecord = args.use_tfrecord
+        self.num_shards = args.num_shards
 
         self.ds_iter = args.ds_iter
         self.iteration = args.iteration
@@ -70,27 +69,27 @@ class StarGAN_v2():
         """ Discriminator """
         self.sn = args.sn
 
-        self.sample_dir = os.path.join(args.sample_dir, self.model_dir)
+        self.sample_dir = os.path.join(args.save_dir, self.model_dir, 'samples')
         check_folder(self.sample_dir)
 
-        self.checkpoint_dir = os.path.join(args.checkpoint_dir, self.model_dir)
+        self.checkpoint_dir = os.path.join(args.save_dir, self.model_dir, 'checkpoint')
         check_folder(self.checkpoint_dir)
 
-        self.log_dir = os.path.join(args.log_dir, self.model_dir)
+        self.log_dir = os.path.join(args.save_dir, self.model_dir, 'tensorboard')
         check_folder(self.log_dir)
 
-        self.result_dir = os.path.join(args.result_dir, self.model_dir)
+        self.result_dir = os.path.join(args.save_dir, self.model_dir, 'results')
         check_folder(self.result_dir)
 
-
-        dataset_path = './dataset'
-
-        self.use_tfrecord = args.use_tfrecord
-        self.num_shards = args.num_shards
         self.use_tpu = args.use_tpu
 
-        self.dataset_path = os.path.join(dataset_path, self.dataset_name, 'train')
-        self.test_dataset_path = os.path.join(dataset_path, self.dataset_name, 'test')
+        if self.use_tfrecord:
+            dataset_path = 'gs://celeba-hq-dataset/'
+        else:
+            dataset_path = os.path.join('./dataset', self.dataset_name)
+        
+        self.dataset_path = os.path.join(dataset_path, 'train')
+        self.test_dataset_path = os.path.join(dataset_path, 'test')
         self.domain_list = sorted([os.path.basename(x) for x in glob(self.dataset_path + '/*')])
         self.num_domains = len(self.domain_list)
 
@@ -135,7 +134,7 @@ class StarGAN_v2():
             print("Dataset number : ", dataset_num)
 
             if self.use_tfrecord:
-                filenames = ['{}_part_{}'.format(self.dataset_path, i) for i in range(self.num_shards)]
+                filenames = ['{}_part_{}'.format(os.path.join(self.dataset_path, 'data.tfrecord.gzip'), i) for i in range(self.num_shards)]
                 img_and_domain = tf.data.TFRecordDataset(filenames, compression_type='GZIP', num_parallel_reads=self.num_shards)
             else:   
                 img_and_domain = tf.data.Dataset.from_tensor_slices((img_class.images, img_class.domains))
@@ -333,12 +332,12 @@ class StarGAN_v2():
     def train_combined_step(self, x_real, y_org, x_refs, y_trgs, z_trgs, ds_weight):
 
         # update discriminator
-        d_out_lat = self.strategy.run(self.d_train_step, args=(x_real, y_org, y_trg), kwargs={'z_trg': z_trgs[0]})
-        d_out_ref = self.strategy.run(self.d_train_step, args=(x_real, y_org, y_trg), kwargs={'x_ref': x_refs[0]})
+        d_out_lat = self.strategy.run(self.d_train_step, args=(x_real, y_org, y_trgs[0]), kwargs={'z_trg': z_trgs[0]})
+        d_out_ref = self.strategy.run(self.d_train_step, args=(x_real, y_org, y_trgs[0]), kwargs={'x_ref': x_refs[0]})
 
         # update generator
-        g_out_lat = self.strategy.run(g_train_step, args=(x_real, y_org, y_trgs, ds_weight), kwargs={'z_trgs': z_trgs})
-        g_out_ref = self.strategy.run(g_train_step, args=(x_real, y_org, y_trgs, ds_weight), kwargs={'x_refs': x_refs})
+        g_out_lat = self.strategy.run(self.g_train_step, args=(x_real, y_org, y_trgs, ds_weight), kwargs={'z_trgs': z_trgs})
+        g_out_ref = self.strategy.run(self.g_train_step, args=(x_real, y_org, y_trgs, ds_weight), kwargs={'x_refs': x_refs})
 
         # compute moving average of network parameters
         moving_average(self.generator, self.generator_ema, beta=self.ema_decay)
@@ -346,7 +345,7 @@ class StarGAN_v2():
         moving_average(self.style_encoder, self.style_encoder_ema, beta=self.ema_decay)
 
         # aggregate and return losses over all replicas
-        return ((self.strategy.reduce(tf.distribute.ReduceOp.SUM, loss, axis=None) for loss in losses) for losses in (d_out_lat, d_out_ref, g_out_lat, d_out_ref))
+        return [[self.strategy.reduce(tf.distribute.ReduceOp.SUM, loss, axis=None) for loss in losses] for losses in (d_out_lat, d_out_ref, g_out_lat, g_out_ref)]
 
     def train(self):
 
@@ -354,6 +353,11 @@ class StarGAN_v2():
 
         # setup tensorboards
         train_summary_writer = tf.summary.create_file_writer(self.log_dir)
+
+        self.generator.summary()
+        self.discriminator.summary()
+        self.mapping_network.summary()
+        self.style_encoder.summary()
 
         for idx in range(self.start_iteration, self.iteration):
             iter_start_time = time.time()
@@ -370,15 +374,7 @@ class StarGAN_v2():
 
             loss_package = self.train_combined_step(x_real, y_org, (x_ref, x_ref2), (y_trg, y_trg2), (z_trg, z_trg2), ds_weight)
 
-            if idx == 0 :
-                g_params = self.generator.count_params()
-                d_params = self.discriminator.count_params()
-                print("G network parameters : ", format(g_params, ','))
-                print("D network parameters : ", format(d_params, ','))
-                print("Total network parameters : ", format(g_params + d_params, ','))
-
             # save to tensorboard
-
             with train_summary_writer.as_default():
                 tf.summary.scalar('g/latent/adv_loss', loss_package[2][0], step=idx)
                 tf.summary.scalar('g/latent/sty_loss', loss_package[2][1], step=idx)
@@ -415,7 +411,8 @@ class StarGAN_v2():
                 self.refer_canvas(x_real, x_ref, y_trg, ref_fake_save_path, img_num=5)
 
             print("iter: [%6d/%6d] time: %4.4f d_loss: %.8f, g_loss: %.8f" % (
-            idx, self.iteration, time.time() - iter_start_time, d_loss_latent+d_loss_ref, g_loss_latent+g_loss_ref))
+            idx, self.iteration, time.time() - iter_start_time, loss_package[0][-1]+loss_package[2][-1], loss_package[1][-1]+loss_package[3][-1]))
+            del x_real, y_org, x_ref, y_trg, x_ref2, y_trg2, z_trg, z_trg2, loss_package
 
         # save model for final step
         self.manager.save(checkpoint_number=self.iteration)

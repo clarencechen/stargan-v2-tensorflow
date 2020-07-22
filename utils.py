@@ -154,10 +154,10 @@ def return_images(images, size) :
 
     return x
 
-def check_folder(log_dir):
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    return log_dir
+def check_folder(path_name):
+    if not tf.io.gfile.exists(path_name):
+        tf.io.gfile.makedirs(path_name)
+    return path_name
 
 
 def str2bool(x):

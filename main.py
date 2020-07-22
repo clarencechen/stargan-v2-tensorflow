@@ -41,7 +41,7 @@ def parse_args():
     parser.add_argument('--r1_weight', type=float, default=1, help='Weight for R1 regularization')
 
     parser.add_argument('--gan_type', type=str, default='gan-gp', help='gan / lsgan / gan-gp / hinge')
-    parser.add_argument('--sn', type=str2bool, default=False, help='using spectral norm')
+    parser.add_argument('--sn', action='store_true', help='using spectral norm')
 
     parser.add_argument('--hidden_dim', type=int, default=512, help='Hidden dimension of mapping network')
     parser.add_argument('--latent_dim', type=int, default=16, help='Latent vector dimension')
@@ -49,37 +49,21 @@ def parse_args():
 
     parser.add_argument('--img_size', type=int, default=256, help='The size of image')
     parser.add_argument('--img_ch', type=int, default=3, help='The size of image channel')
-    parser.add_argument('--augment_flag', type=str2bool, default=True, help='Image augmentation use or not')
+    parser.add_argument('--augment_flag', action='store_true', help='Image augmentation use or not')
 
-    parser.add_argument('--use_tfrecord', type=str2bool, default=False, help='Flag to use tfrecord packed dataset')
-    parser.add_argument('--num_shards', type=int, default=False, help='Number of shards in divided tfrecord dataset')
-    parser.add_argument('--use_tpu', type=str2bool, default=False, help='Flag to use available TPU device')
+    parser.add_argument('--use_tfrecord', action='store_true', help='Flag to use tfrecord packed dataset')
+    parser.add_argument('--num_shards', type=int, default=1, help='Number of shards in divided tfrecord dataset')
+    parser.add_argument('--use_tpu', action='store_true', help='Flag to use available TPU device')
 
-    parser.add_argument('--checkpoint_dir', type=str, default='checkpoint',
-                        help='Directory name to save the checkpoints')
-    parser.add_argument('--result_dir', type=str, default='results',
-                        help='Directory name to save the generated images')
-    parser.add_argument('--log_dir', type=str, default='logs',
-                        help='Directory name to save training logs')
-    parser.add_argument('--sample_dir', type=str, default='samples',
-                        help='Directory name to save the samples on training')
+    parser.add_argument('--save_dir', type=str, default='.', help='Directory name to save checkpoints/logs/outputs')
 
     return check_args(parser.parse_args())
 
 
 """checking arguments"""
 def check_args(args):
-    # --checkpoint_dir
-    check_folder(args.checkpoint_dir)
-
-    # --result_dir
-    check_folder(args.result_dir)
-
-    # --result_dir
-    check_folder(args.log_dir)
-
-    # --sample_dir
-    check_folder(args.sample_dir)
+    # --save_dir
+    check_folder(args.save_dir)
 
     # --epoch
     try:
@@ -92,6 +76,14 @@ def check_args(args):
         assert args.batch_size >= 1
     except:
         print('batch size must be larger than or equal to one')
+
+    # --use_tpu
+    if args.use_tpu:
+        try:
+            assert use_tfrecord
+        except:
+            print('must use tfrecord dataset when training on tpu device')
+
     return args
 
 """main"""
