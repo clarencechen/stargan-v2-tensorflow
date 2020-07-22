@@ -14,7 +14,6 @@ from tensorflow.python.data.experimental import AUTOTUNE, prefetch_to_device
 
 from glob import glob
 from tqdm import tqdm
-from tqdm.contrib import tenumerate
 from networks import *
 from copy import deepcopy
 import PIL.Image
@@ -360,7 +359,7 @@ class StarGAN_v2():
             iter_start_time = time.time()
 
             # decay weight for diversity sensitive loss as a tf.Tensor
-            ds_weight = tf.maximum(0, self.ds_weight_init -(self.ds_weight_init / self.ds_iter) * idx)
+            ds_weight = tf.maximum(0.0, self.ds_weight_init -(self.ds_weight_init / self.ds_iter) * idx)
             
             x_real, y_org = next(self.img_and_domain_iter)
             x_ref, y_trg = next(self.img_and_domain_iter)
@@ -524,7 +523,7 @@ class StarGAN_v2():
 
             if merge_size == 0:
                 # [len_src_imgs : len_ref_imgs] matching
-                for src_idx, src_img_path in tenumerate(source_images):
+                for src_idx, src_img_path in enumerate(source_images):
                     src_name, src_extension = os.path.splitext(src_img_path)
                     src_name = os.path.basename(src_name)
 
@@ -536,7 +535,7 @@ class StarGAN_v2():
                     else:
                         src_img = tf.concat([src_img, src_img_], axis=0)
 
-                for ref_idx, (ref_img_path, ref_img_domain_) in tenumerate(zip(reference_images, reference_domain)):
+                for ref_idx, (ref_img_path, ref_img_domain_) in enumerate(zip(reference_images, reference_domain)):
                     ref_name, ref_extension = os.path.splitext(ref_img_path)
                     ref_name = os.path.basename(ref_name)
 
@@ -559,7 +558,7 @@ class StarGAN_v2():
             else:
                 # [merge_size : merge_size] matching
                 src_size = 0
-                for src_idx, src_img_path in tenumerate(source_images):
+                for src_idx, src_img_path in enumerate(source_images):
                     src_name, src_extension = os.path.splitext(src_img_path)
                     src_name = os.path.basename(src_name)
 
