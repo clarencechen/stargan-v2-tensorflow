@@ -43,8 +43,8 @@ class StarGAN_v2():
         self.img_size = args.img_size
         self.img_ch = args.img_ch
 
-        self.lr = args.lr
-        self.f_lr = args.f_lr
+        self.lr = args.lr * strategy.num_replicas_in_sync
+        self.f_lr = args.f_lr * strategy.num_replicas_in_sync
         self.beta1 = args.beta1
         self.beta2 = args.beta2
 
