@@ -260,11 +260,11 @@ class StarGAN_v2():
 
             x_fake = self.generator([x_real, s_trg])
             fake_logit = self.discriminator([x_fake, y_trg])
-            g_adv_loss = self.adv_weight * generator_loss(self.gan_type, fake_logit)
+            g_adv_loss = self.adv_weight * generator_loss(self.gan_type, fake_logit) / self.batch_size
 
             # style reconstruction loss
             s_pred = self.style_encoder([x_fake, y_trg])
-            g_sty_loss = self.sty_weight * L1_loss(s_pred, s_trg)
+            g_sty_loss = self.sty_weight * L1_loss(s_pred, s_trg, batch_size=self.batch_size)
 
             # diversity sensitive loss
             if z_trgs is not None:
@@ -274,12 +274,12 @@ class StarGAN_v2():
 
             x_fake2 = self.generator([x_real, s_trg2])
             x_fake2 = tf.stop_gradient(x_fake2)
-            g_ds_loss = -ds_weight * L1_loss(x_fake, x_fake2)
+            g_ds_loss = -ds_weight * L1_loss(x_fake, x_fake2, batch_size=self.batch_size)
 
             # cycle-consistency loss
             s_org = self.style_encoder([x_real, y_org])
             x_rec = self.generator([x_fake, s_org])
-            g_cyc_loss = self.cyc_weight * L1_loss(x_rec, x_real)
+            g_cyc_loss = self.cyc_weight * L1_loss(x_rec, x_real, batch_size=self.batch_size)
 
             regular_loss = regularization_loss(self.generator)
 
@@ -315,10 +315,10 @@ class StarGAN_v2():
             real_logit = self.discriminator([x_real, y_org])
             fake_logit = self.discriminator([x_fake, y_trg])
 
-            d_adv_loss = self.adv_weight * discriminator_loss(self.gan_type, real_logit, fake_logit)
+            d_adv_loss = self.adv_weight * discriminator_loss(self.gan_type, real_logit, fake_logit) / self.batch_size
 
             if self.gan_type == 'gan-gp':
-                d_adv_loss += self.r1_weight * r1_gp_req(self.discriminator, x_real, y_org)
+                d_adv_loss += self.r1_weight * r1_gp_req(self.discriminator, x_real, y_org) / self.batch_size
 
             regular_loss = regularization_loss(self.discriminator)
 
@@ -409,8 +409,8 @@ class StarGAN_v2():
                 #self.latent_canvas(x_real, latent_fake_save_path)
                 #self.refer_canvas(x_real, x_ref, y_trg, ref_fake_save_path, img_num=5)
 
-            print("iter: [%6d/%6d] time: %4.4f d_loss: %.8f, g_loss: %.8f" % (
-            idx, self.iteration, time.time() - iter_start_time, loss_package[0][-1]+loss_package[2][-1], loss_package[1][-1]+loss_package[3][-1]))
+            print("iter: [%6d/%6d] time: %4.4f d_loss: %.8f, g_loss: %.8f, sty_loss: %.8f" % (
+            idx, self.iteration, time.time() - iter_start_time, loss_package[0][-1]+loss_package[1][-1], loss_package[2][-1]+loss_package[3][-1], loss_package[2][1]+loss_package[3][1]))
             del x_real, y_org, x_ref, y_trg, x_ref2, y_trg2, z_trg, z_trg2, loss_package
 
         # save model for final step
