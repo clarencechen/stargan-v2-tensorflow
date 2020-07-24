@@ -406,8 +406,8 @@ class StarGAN_v2():
                 latent_fake_save_path = './{}/latent_{:07d}.jpg'.format(self.sample_dir, idx + 1)
                 ref_fake_save_path = './{}/ref_{:07d}.jpg'.format(self.sample_dir, idx + 1)
 
-                self.latent_canvas(x_real, latent_fake_save_path)
-                self.refer_canvas(x_real, x_ref, y_trg, ref_fake_save_path, img_num=5)
+                #self.latent_canvas(x_real, latent_fake_save_path)
+                #self.refer_canvas(x_real, x_ref, y_trg, ref_fake_save_path, img_num=5)
 
             print("iter: [%6d/%6d] time: %4.4f d_loss: %.8f, g_loss: %.8f" % (
             idx, self.iteration, time.time() - iter_start_time, loss_package[0][-1]+loss_package[2][-1], loss_package[1][-1]+loss_package[3][-1]))
