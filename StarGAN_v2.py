@@ -203,16 +203,16 @@ class StarGAN_v2():
                                                 discriminator=self.discriminator,
                                                 g_optimizer=self.g_optimizer, e_optimizer=self.e_optimizer, f_optimizer=self.f_optimizer,
                                                 d_optimizer=self.d_optimizer)
-            self.manager = tf.train.CheckpointManager(self.ckpt, self.checkpoint_dir, max_to_keep=1)
-            self.start_iteration = 0
+                self.manager = tf.train.CheckpointManager(self.ckpt, self.checkpoint_dir, max_to_keep=1)
+                self.start_iteration = 0
 
-            if self.manager.latest_checkpoint:
-                self.ckpt.restore(self.manager.latest_checkpoint).expect_partial()
-                self.start_iteration = int(self.manager.latest_checkpoint.split('-')[-1])
-                print('Latest checkpoint restored!!')
-                print('start iteration : ', self.start_iteration)
-            else:
-                print('Not restoring from saved checkpoint')
+                if self.manager.latest_checkpoint:
+                    self.ckpt.restore(self.manager.latest_checkpoint).expect_partial()
+                    self.start_iteration = int(self.manager.latest_checkpoint.split('-')[-1])
+                    print('Latest checkpoint restored!!')
+                    print('start iteration : ', self.start_iteration)
+                else:
+                    print('Not restoring from saved checkpoint')
 
         else:
             """ Test """
