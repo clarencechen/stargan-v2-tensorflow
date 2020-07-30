@@ -61,7 +61,6 @@ class StarGAN_v2():
         """ Generator """
         self.latent_dim = args.latent_dim
         self.style_dim = args.style_dim
-        self.num_style = args.num_style
 
         """ Mapping Network """
         self.hidden_dim = args.hidden_dim
@@ -110,7 +109,6 @@ class StarGAN_v2():
         print("##### Generator #####")
         print("# latent_dim : ", self.latent_dim)
         print("# style_dim : ", self.style_dim)
-        print("# num_style : ", self.num_style)
 
         print()
 
@@ -403,11 +401,13 @@ class StarGAN_v2():
             if np.mod(idx + 1, self.print_freq) == 0:
 
 
-                latent_fake_save_path = './{}/latent_{:07d}.jpg'.format(self.sample_dir, idx + 1)
-                ref_fake_save_path = './{}/ref_{:07d}.jpg'.format(self.sample_dir, idx + 1)
+                latent_fake_save_path = '{}/latent_{:07d}.jpg'.format(self.sample_dir, idx + 1)
+                ref_fake_save_path = '{}/ref_{:07d}.jpg'.format(self.sample_dir, idx + 1)
 
-                #self.latent_canvas(x_real, latent_fake_save_path)
-                #self.refer_canvas(x_real, x_ref, y_trg, ref_fake_save_path, img_num=5)
+                latent_out = self.latent_canvas(x_real, z_trg)
+                #refer_out = self.refer_canvas(x_real, x_ref, y_trg)
+                latent_out.save(latent_fake_save_path)
+                #refer_out.save(ref_fake_save_path)
 
             print("iter: [%6d/%6d] time: %4.4f d_loss: %.8f, g_loss: %.8f, sty_loss: %.8f" % (
             idx, self.iteration, time.time() - iter_start_time, loss_package[0][-1]+loss_package[1][-1], loss_package[2][-1]+loss_package[3][-1], loss_package[2][1]+loss_package[3][1]))
@@ -466,31 +466,32 @@ class StarGAN_v2():
 
         canvas.save(path)
 
-    def latent_canvas(self, x_real, path):
-        canvas = PIL.Image.new('RGB', (self.img_size * (self.num_domains + 1) + 10, self.img_size * self.num_style), 'white')
+    
+    def latent_canvas(self, x_real, z_trg):
+        canvas = PIL.Image.new('RGB', (self.img_size * (self.num_domains + 1) + 10, self.img_size * self.batch_size), 'white')
 
-        x_real = tf.expand_dims(x_real[0], axis=0)
-        src_image = postprocess_images(x_real)[0]
-        canvas.paste(PIL.Image.fromarray(np.uint8(src_image), 'RGB'), (0, 0))
+        for col in range(self.num_domains):
+            y_trg = tf.reshape(tf.constant([col]), shape=[1, 1])
+            x_fake = self.strategy.run(self.latent_canvas_inner, args=(x_real, y_trg, z_trg))
 
-        domain_fix_list = tf.constant([idx for idx in range(self.num_domains)])
+            if self.strategy.num_replicas_in_sync > 1:
+                src_image = tf.concat(list(x_real.values), axis=0)
+                x_fake = tf.concat(list(x_fake.values), axis=0)
 
-        z_trgs = tf.random.normal(shape=[self.num_style, self.latent_dim])
+            src_image = postprocess_images(src_image).numpy()
+            x_fake = postprocess_images(x_fake).numpy()
 
-        for row in range(self.num_style):
-            z_trg = tf.expand_dims(z_trgs[row], axis=0)
+            for row in range(self.batch_size):
+                canvas.paste(PIL.Image.fromarray(np.uint8(src_image[row]), 'RGB'), (0, row * self.img_size))
+                canvas.paste(PIL.Image.fromarray(np.uint8(x_fake[row]), 'RGB'), ((col + 1) * self.img_size + 10, row * self.img_size))
 
-            for col, y_trg in enumerate(list(domain_fix_list)):
-                y_trg = tf.reshape(y_trg, shape=[1, 1])
-                s_trg = self.mapping_network_ema([z_trg, y_trg])
-                x_fake = self.generator_ema([x_real, s_trg])
-                x_fake = postprocess_images(x_fake)
+        return canvas
 
-                col_image = x_fake[0]
-
-                canvas.paste(PIL.Image.fromarray(np.uint8(col_image), 'RGB'), ((col + 1) * self.img_size + 10, row * self.img_size))
-
-        canvas.save(path)
+    @tf.function
+    def latent_canvas_inner(self, x_real, y_trg, z_trg):
+        s_trg = self.mapping_network_ema([z_trg, y_trg])
+        x_fake = self.generator_ema([x_real, s_trg])
+        return x_fake
 
     def test(self, merge=True, merge_size=0):
         source_path = os.path.join(self.test_dataset_path, 'src_imgs')
