@@ -429,29 +429,23 @@ class StarGAN_v2():
         return "{}_{}_{}{}".format(self.model_name, self.dataset_name, self.gan_type, sn)
 
     def refer_canvas(self, x_real, x_ref, y_trg, path, img_num):
-        if type(img_num) == list:
-            # In test phase
-            src_img_num = img_num[0]
-            ref_img_num = img_num[1]
-        else:
-            src_img_num = min(img_num, self.batch_size)
-            ref_img_num = min(img_num, self.batch_size)
-
-        x_real = x_real[:src_img_num]
-        x_ref = x_ref[:ref_img_num]
-        y_trg = y_trg[:ref_img_num]
-
         canvas = PIL.Image.new('RGB', (self.img_size * (src_img_num + 1) + 10, self.img_size * (ref_img_num + 1) + 10),
                                'white')
 
-        x_real_post = postprocess_images(x_real)
-        x_ref_post = postprocess_images(x_ref)
+        if self.strategy.num_replicas_in_sync > 1:
+            x_real_post = postprocess_images(tf.concat(list(x_real.values), axis=0)).numpy()
+            x_ref_post = postprocess_images(tf.concat(list(x_ref.values), axis=0)).numpy()
+        else:
+            x_real_post = postprocess_images(x_real).numpy()
+            x_ref_post = postprocess_images(x_ref).numpy()
 
-        for col, src_image in enumerate(list(x_real_post)):
-            canvas.paste(PIL.Image.fromarray(np.uint8(src_image), 'RGB'), ((col + 1) * self.img_size + 10, 0))
+        x_real_stacked = x_real_post.transpose(1, 0, 2).reshape(-1, self.img_size)
+        x_ref_stacked = x_ref_post.transpose(1, 2, 0).reshape(self.img_size, -1)
+
+        canvas.paste(PIL.Image.fromarray(np.uint8(x_real_stacked), 'RGB'), ((col + 1) * self.img_size + 10, 0))
+        canvas.paste(PIL.Image.fromarray(np.uint8(x_ref_stacked), 'RGB'), (0, (row + 1) * self.img_size + 10))
 
         for row, dst_image in enumerate(list(x_ref_post)):
-            canvas.paste(PIL.Image.fromarray(np.uint8(dst_image), 'RGB'), (0, (row + 1) * self.img_size + 10))
 
             row_images = np.stack([dst_image] * src_img_num)
             row_images = preprocess_fit_train_image(row_images)
@@ -470,8 +464,12 @@ class StarGAN_v2():
     def latent_canvas(self, x_real, z_trg):
         canvas = PIL.Image.new('RGB', (self.img_size * (self.num_domains + 1) + 10, self.img_size * self.batch_size), 'white')
 
-        src_image = tf.concat(list(x_real.values), axis=0)
-        src_image_stacked = postprocess_images(src_image).numpy().transpose(1, 0, 2).reshape(self.img_size, -1)
+        if self.strategy.num_replicas_in_sync > 1:
+            src_image = postprocess_images(tf.concat(list(x_real.values), axis=0)).numpy()
+        else:
+            src_image = postprocess_images(src_image).numpy()
+
+        src_image_stacked = src_image.transpose(1, 0, 2).reshape(self.img_size, -1)
         canvas.paste(PIL.Image.fromarray(np.uint8(src_image_stacked), 'RGB'), (0, 0))
 
         for col in range(self.num_domains):
