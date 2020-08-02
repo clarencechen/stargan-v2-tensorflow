@@ -470,20 +470,19 @@ class StarGAN_v2():
     def latent_canvas(self, x_real, z_trg):
         canvas = PIL.Image.new('RGB', (self.img_size * (self.num_domains + 1) + 10, self.img_size * self.batch_size), 'white')
 
+        src_image = tf.concat(list(x_real.values), axis=0)
+        src_image_stacked = postprocess_images(src_image).numpy().transpose(1, 0, 2).reshape(self.img_size, -1)
+        canvas.paste(PIL.Image.fromarray(np.uint8(src_image_stacked), 'RGB'), (0, 0))
+
         for col in range(self.num_domains):
             y_trg = tf.reshape(tf.constant([col]), shape=[1, 1])
             x_fake = self.strategy.run(self.latent_canvas_inner, args=(x_real, y_trg, z_trg))
 
             if self.strategy.num_replicas_in_sync > 1:
-                src_image = tf.concat(list(x_real.values), axis=0)
                 x_fake = tf.concat(list(x_fake.values), axis=0)
 
-            src_image = postprocess_images(src_image).numpy()
-            x_fake = postprocess_images(x_fake).numpy()
-
-            for row in range(self.batch_size):
-                canvas.paste(PIL.Image.fromarray(np.uint8(src_image[row]), 'RGB'), (0, row * self.img_size))
-                canvas.paste(PIL.Image.fromarray(np.uint8(x_fake[row]), 'RGB'), ((col + 1) * self.img_size + 10, row * self.img_size))
+            x_fake_stacked = postprocess_images(x_fake).numpy().transpose(1, 0, 2).reshape(self.img_size, -1)
+            canvas.paste(PIL.Image.fromarray(np.uint8(x_fake_stacked), 'RGB'), ((col + 1) * self.img_size + 10, 0))
 
         return canvas
 
