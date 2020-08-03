@@ -428,7 +428,7 @@ class StarGAN_v2():
 
         return "{}_{}_{}{}".format(self.model_name, self.dataset_name, self.gan_type, sn)
 
-    def refer_canvas(self, x_real, x_ref, y_trg, path, img_num):
+    def refer_canvas(self, x_real, x_ref, y_trg):
         canvas = PIL.Image.new('RGB', (self.img_size * (self.batch_size + 1) + 10, self.img_size * (self.batch_size + 1) + 10),
                                'white')
 
@@ -445,22 +445,30 @@ class StarGAN_v2():
         canvas.paste(PIL.Image.fromarray(np.uint8(x_real_stacked), 'RGB'), (self.img_size + 10, 0))
         canvas.paste(PIL.Image.fromarray(np.uint8(x_ref_stacked), 'RGB'), (0, self.img_size + 10))
 
-        for row, dst_image in enumerate(list(x_ref_post)):
+        if self.strategy.num_replicas_in_sync > 1:
+            x_ref = tf.concat(list(x_ref.values), axis=0)
+            y_trg = tf.concat(list(y_trg.values), axis=0)
 
-            row_images = np.stack([dst_image] * self.batch_size)
-            row_images = preprocess_fit_train_image(row_images)
-            row_images_y = np.stack([y_trg[row]] * self.batch_size)
+        for row in range(self.batch_size):
+            row_images = tf.stack([x_ref[row]] * self.batch_size)
+            row_images_y = tf.stack([y_trg[row]] * self.batch_size)
 
-            s_trg = self.style_encoder_ema([row_images, row_images_y])
-            row_fake_images = postprocess_images(self.generator_ema([x_real, s_trg]))
+            x_fake = self.strategy.run(self.refer_canvas_inner, args=(x_real, row_images, row_images_y))
 
-            for col, image in enumerate(list(row_fake_images)):
-                canvas.paste(PIL.Image.fromarray(np.uint8(image), 'RGB'),
-                             ((col + 1) * self.img_size + 10, (row + 1) * self.img_size + 10))
+            if self.strategy.num_replicas_in_sync:
+                x_fake = tf.concat(list(x_fake.values), axis=0)
 
-        canvas.save(path)
+            x_fake_stacked = postprocess_images(x_fake).numpy().transpose(1, 0, 2, 3).reshape(self.img_size, -1, 3)
+            canvas.paste(PIL.Image.fromarray(np.uint8(x_fake_stacked), 'RGB'), (self.img_size + 10, (row + 1) * self.img_size + 10))
 
-    
+        return canvas
+
+    @tf.function
+    def refer_canvas_inner(self, x_real, x_ref, y_trg):
+        s_trg = self.style_encoder_ema([x_ref, y_trg])
+        x_fake = self.generator_ema([x_real, s_trg])
+        return x_fake
+
     def latent_canvas(self, x_real, z_trg):
         canvas = PIL.Image.new('RGB', (self.img_size * (self.num_domains + 1) + 10, self.img_size * self.batch_size), 'white')
 
