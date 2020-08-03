@@ -405,9 +405,13 @@ class StarGAN_v2():
                 ref_fake_save_path = '{}/ref_{:07d}.jpg'.format(self.sample_dir, idx + 1)
 
                 latent_out = self.latent_canvas(x_real, z_trg)
-                #refer_out = self.refer_canvas(x_real, x_ref, y_trg)
-                latent_out.save(latent_fake_save_path)
-                #refer_out.save(ref_fake_save_path)
+                refer_out = self.refer_canvas(x_real, x_ref, y_trg)
+
+                latent_fobj = tf.io.gfile.GFile(latent_fake_save_path, mode='wb')
+                refer_fobj = tf.io.gfile.GFile(ref_fake_save_path, mode='wb')
+
+                latent_out.save(latent_fobj, format='jpeg')
+                refer_out.save(refer_fobj, format='jpeg')
 
             print("iter: [%6d/%6d] time: %4.4f d_loss: %.8f, g_loss: %.8f, sty_loss: %.8f" % (
             idx, self.iteration, time.time() - iter_start_time, loss_package[0][-1]+loss_package[1][-1], loss_package[2][-1]+loss_package[3][-1], loss_package[2][1]+loss_package[3][1]))
