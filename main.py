@@ -106,7 +106,7 @@ def main():
     if tpu :
         tf.config.experimental_connect_to_cluster(tpu)
         tf.tpu.experimental.initialize_tpu_system(tpu)
-        strategy = tf.distribute.experimental.TPUStrategy(tpu)
+        strategy = tf.distribute.TPUStrategy(tpu)
     
     else :
         automatic_gpu_usage()
