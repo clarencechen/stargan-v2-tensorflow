@@ -454,8 +454,8 @@ class StarGAN_v2():
             y_trg = tf.concat(list(y_trg.values), axis=0)
 
         for row in range(self.batch_size):
-            row_images = tf.stack([x_ref[row]] * self.batch_size / self.strategy.num_replicas_in_sync)
-            row_images_y = tf.stack([y_trg[row]] * self.batch_size / self.strategy.num_replicas_in_sync)
+            row_images = tf.stack([x_ref[row]] * (self.batch_size / self.strategy.num_replicas_in_sync))
+            row_images_y = tf.stack([y_trg[row]] * (self.batch_size / self.strategy.num_replicas_in_sync))
 
             x_fake = self.strategy.run(self.refer_canvas_inner, args=(x_real, row_images, row_images_y))
 
