@@ -413,14 +413,19 @@ class StarGAN_v2():
                 latent_out.save(latent_fobj, format='jpeg')
                 refer_out.save(refer_fobj, format='jpeg')
 
-            print("iter: [%6d/%6d] time: %4.4f d_loss: %.8f, g_loss: %.8f, sty_loss: %.8f" % (
-            idx, self.iteration, time.time() - iter_start_time, loss_package[0][-1]+loss_package[1][-1], loss_package[2][-1]+loss_package[3][-1], loss_package[2][1]+loss_package[3][1]))
+            print("iter: {0:6d}/{1:6d} time: {2:4.4f} d_loss: {3:.8f}, g_loss: {4:.8f}, sty_loss: {5:.8f}, ds_loss: {6:.8f}".format(
+                idx, self.iteration, time.time() - iter_start_time,
+                loss_package[0][-1] + loss_package[1][-1],
+                loss_package[2][-1] + loss_package[3][-1],
+                loss_package[2][1] + loss_package[3][1],
+                loss_package[2][2] + loss_package[3][2]
+                ))
             del x_real, y_org, x_ref, y_trg, x_ref2, y_trg2, z_trg, z_trg2, loss_package
 
         # save model for final step
         self.manager.save(checkpoint_number=self.iteration)
 
-        print("Total train time: %4.4f" % (time.time() - start_time))
+        print("Total train time: {4.4f}".format(time.time() - start_time))
 
     @property
     def model_dir(self):
