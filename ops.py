@@ -349,44 +349,44 @@ def regularization_loss(model):
 
     return loss
 
-def L1_loss(x, y, batch_size):
-    loss = tf.nn.compute_average_loss(tf.reduce_mean(tf.reshape(tf.abs(x - y), (x.shape[0], -1)), axis=1), global_batch_size=batch_size)
+def L1_loss(x, y):
+    loss = tf.reduce_mean(tf.reshape(tf.abs(x - y), (x.shape[0], -1)), axis=1)
 
-    return loss
+    return tf.reduce_sum(loss)
 
-def discriminator_loss(gan_type, real_logit, fake_logit):
+def discriminator_loss(real_logit, fake_logit, gan_type):
 
     real_loss = 0
     fake_loss = 0
 
     if gan_type == 'lsgan' :
-        real_loss = tf.reduce_sum(tf.math.squared_difference(real_logit, 1.0))
-        fake_loss = tf.reduce_sum(tf.square(fake_logit))
+        real_loss = tf.reduce_mean((1.0 - real_logit) ** 2, axis=-1)
+        fake_loss = tf.reduce_mean(fake_logit ** 2, axis=-1)
 
     if gan_type == 'gan' or gan_type == 'gan-gp' :
-        real_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(real_logit), logits=real_logit))
-        fake_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(fake_logit), logits=fake_logit))
+        real_loss = tf.keras.losses.binary_crossentropy(tf.ones_like(real_logit), real_logit)
+        fake_loss = tf.keras.losses.binary_crossentropy(tf.zeros_like(fake_logit), fake_logit)
 
     if gan_type == 'hinge' :
-        real_loss = tf.reduce_sum(Relu(1.0 - real_logit))
-        fake_loss = tf.reduce_sum(Relu(1.0 + fake_logit))
+        real_loss = tf.keras.losses.hinge(tf.ones_like(real_logit), real_logit)
+        fake_loss = tf.keras.losses.hinge(tf.zeros_like(real_logit), real_logit)
 
-    return real_loss + fake_loss
+    return tf.reduce_sum(real_loss + fake_loss)
 
-def generator_loss(gan_type, fake_logit):
+def generator_loss(fake_logit, gan_type):
     fake_loss = 0
 
     if gan_type == 'lsgan' :
-        fake_loss = tf.reduce_sum(tf.math.squared_difference(fake_logit, 1.0))
+        fake_loss = tf.reduce_mean((1.0 - fake_logit) ** 2, axis=-1)
 
     if gan_type == 'gan' or gan_type == 'gan-gp':
-        fake_loss = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(fake_logit), logits=fake_logit))
+        fake_loss = tf.keras.losses.binary_crossentropy(tf.ones_like(fake_logit), fake_logit)
 
     if gan_type == 'hinge' :
-        fake_loss = -tf.reduce_sum(fake_logit)
+        fake_loss = -tf.reduce_mean(fake_logit, axis=-1)
 
 
-    return fake_loss
+    return tf.reduce_sum(fake_loss)
 
 def r1_gp_req(discriminator, x_real, y_org):
     with tf.GradientTape() as p_tape:

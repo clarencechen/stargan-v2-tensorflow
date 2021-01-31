@@ -258,11 +258,11 @@ class StarGAN_v2():
 
             x_fake = self.generator([x_real, s_trg])
             fake_logit = self.discriminator([x_fake, y_trg])
-            g_adv_loss = self.adv_weight * generator_loss(self.gan_type, fake_logit) / self.batch_size
+            g_adv_loss = self.adv_weight * generator_loss(fake_logit, self.gan_type) / self.batch_size
 
             # style reconstruction loss
             s_pred = self.style_encoder([x_fake, y_trg])
-            g_sty_loss = self.sty_weight * L1_loss(s_pred, s_trg, batch_size=self.batch_size)
+            g_sty_loss = self.sty_weight * L1_loss(s_pred, s_trg) / self.batch_size
 
             # diversity sensitive loss
             if z_trgs is not None:
@@ -272,12 +272,12 @@ class StarGAN_v2():
 
             x_fake2 = self.generator([x_real, s_trg2])
             x_fake2 = tf.stop_gradient(x_fake2)
-            g_ds_loss = -ds_weight * L1_loss(x_fake, x_fake2, batch_size=self.batch_size)
+            g_ds_loss = -ds_weight * L1_loss(x_fake, x_fake2) / self.batch_size
 
             # cycle-consistency loss
             s_org = self.style_encoder([x_real, y_org])
             x_rec = self.generator([x_fake, s_org])
-            g_cyc_loss = self.cyc_weight * L1_loss(x_rec, x_real, batch_size=self.batch_size)
+            g_cyc_loss = self.cyc_weight * L1_loss(x_rec, x_real) / self.batch_size
 
             regular_loss = regularization_loss(self.generator)
 
@@ -313,7 +313,7 @@ class StarGAN_v2():
             real_logit = self.discriminator([x_real, y_org])
             fake_logit = self.discriminator([x_fake, y_trg])
 
-            d_adv_loss = self.adv_weight * discriminator_loss(self.gan_type, real_logit, fake_logit) / self.batch_size
+            d_adv_loss = self.adv_weight * discriminator_loss(real_logit, fake_logit, self.gan_type) / self.batch_size
 
             if self.gan_type == 'gan-gp':
                 d_adv_loss += self.r1_weight * r1_gp_req(self.discriminator, x_real, y_org) / self.batch_size
