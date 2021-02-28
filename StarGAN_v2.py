@@ -18,6 +18,8 @@ from networks import *
 from copy import deepcopy
 import PIL.Image
 
+from opts import NeRo
+
 class StarGAN_v2():
     def __init__(self, args, strategy):
         super(StarGAN_v2, self).__init__()
@@ -188,10 +190,10 @@ class StarGAN_v2():
 
 
                 """ Optimizer """
-                self.g_optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr, beta_1=self.beta1, beta_2=self.beta2, epsilon=1e-08)
-                self.e_optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr, beta_1=self.beta1, beta_2=self.beta2, epsilon=1e-08)
-                self.f_optimizer = tf.keras.optimizers.Adam(learning_rate=self.f_lr, beta_1=self.beta1, beta_2=self.beta2, epsilon=1e-08)
-                self.d_optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr, beta_1=self.beta1, beta_2=self.beta2, epsilon=1e-08)
+                self.g_optimizer = NeRo(learning_rate=self.lr, beta=self.beta1, epsilon=1e-08)
+                self.e_optimizer = NeRo(learning_rate=self.lr, beta=self.beta1, epsilon=1e-08)
+                self.f_optimizer = NeRo(learning_rate=self.f_lr, beta=self.beta1, epsilon=1e-08)
+                self.d_optimizer = NeRo(learning_rate=self.lr, beta=self.beta1, epsilon=1e-08)
 
 
                 """ Checkpoint """
